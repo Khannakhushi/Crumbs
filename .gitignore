@@ -1,0 +1,55 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Swift Package Manager
+.build/
+Packages/
+Package.resolved
+
+# Secrets & sensitive
+*.env
+*.pem
+*.p12
+*.key
+*.cer
+*.mobileprovision
+Secrets/
+credentials.*
+
+# API keys
+**/APIKeys.swift
+**/Secrets.swift
+
+# CocoaPods
+Pods/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output
+
+# Misc
+*.swp
+*.lock
+*~
+*.orig
+*.ipa
+*.dSYM.zip
+*.dSYM
