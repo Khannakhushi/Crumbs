@@ -68,16 +68,31 @@ class MusicService {
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 let decoded = try JSONDecoder().decode(TopSongsResponse.self, from: data)
-                let tracks = decoded.feed.results.enumerated().map { i, song in
-                    MusicTrack(
+
+                // Look up each song via iTunes search to get preview URLs
+                var tracks: [MusicTrack] = []
+                for (i, song) in decoded.feed.results.enumerated() {
+                    let query = "\(song.name) \(song.artistName)"
+                        .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                    if let searchURL = URL(string: "https://itunes.apple.com/search?term=\(query)&media=music&limit=1") {
+                        if let (searchData, _) = try? await URLSession.shared.data(from: searchURL),
+                           let searchResult = try? JSONDecoder().decode(SearchResponse.self, from: searchData),
+                           let match = searchResult.results.first {
+                            tracks.append(match)
+                            continue
+                        }
+                    }
+                    // Fallback if lookup fails
+                    tracks.append(MusicTrack(
                         id: Int(song.id) ?? (900000 + i),
                         trackName: song.name,
                         artistName: song.artistName,
                         collectionName: nil,
                         artworkUrl100: song.artworkUrl100,
                         previewUrl: nil
-                    )
+                    ))
                 }
+
                 await MainActor.run {
                     trendingSongs = tracks
                     isLoadingTrending = false
@@ -137,8 +152,13 @@ class MusicService {
 
         guard let urlStr = track.previewUrl, let url = URL(string: urlStr) else { return }
 
+        // Configure audio session for playback
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+        try? AVAudioSession.sharedInstance().setActive(true)
+
         let item = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: item)
+        player?.volume = 1.0
         player?.play()
         playingTrackId = track.id
 

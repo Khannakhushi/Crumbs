@@ -9,6 +9,12 @@ struct SongSearchView: View {
 
     var onSelect: (MusicTrack) -> Void
 
+    private func selectAndDismiss(_ track: MusicTrack) {
+        music.stopPreview()
+        onSelect(track)
+        dismiss()
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -30,7 +36,7 @@ struct SongSearchView: View {
                     .foregroundStyle(Theme.textSecondary)
                 }
             }
-            .toolbarBackground(Theme.bg.opacity(0.8), for: .navigationBar)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         }
         .onAppear {
             focused = true
@@ -62,7 +68,7 @@ struct SongSearchView: View {
                     music.results = []
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
+                        .font(.system(size: 18))
                         .foregroundStyle(Theme.textSecondary)
                 }
             }
@@ -71,7 +77,7 @@ struct SongSearchView: View {
         .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Theme.cardBg)
+                .fill(.ultraThinMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(Theme.divider, lineWidth: 1)
@@ -86,7 +92,7 @@ struct SongSearchView: View {
 
     private var resultsList: some View {
         ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 2) {
+            LazyVStack(spacing: 4) {
                 if music.isSearching {
                     loadingState
                 } else if query.isEmpty {
@@ -109,49 +115,10 @@ struct SongSearchView: View {
         let isPlaying = music.playingTrackId == track.id
 
         return HStack(spacing: 14) {
-            // Album art with play overlay
-            ZStack {
-                if let url = track.artworkMedium, let imgURL = URL(string: url) {
-                    AsyncImage(url: imgURL) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        case .failure:
-                            artPlaceholder
-                        default:
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(Theme.cardBgElevated)
-                                .overlay { ProgressView().tint(Theme.textSecondary).scaleEffect(0.6) }
-                        }
-                    }
-                    .frame(width: 60, height: 60)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                } else {
-                    artPlaceholder
-                }
+            // Album art
+            albumArt(track)
 
-                // Play/pause overlay
-                if track.previewUrl != nil {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            music.togglePreview(for: track)
-                        }
-                    } label: {
-                        Circle()
-                            .fill(.black.opacity(isPlaying ? 0.5 : 0.3))
-                            .frame(width: 32, height: 32)
-                            .overlay {
-                                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .offset(x: isPlaying ? 0 : 1)
-                            }
-                    }
-                }
-            }
-            .frame(width: 60, height: 60)
-
-            // Info
+            // Info + play
             VStack(alignment: .leading, spacing: 3) {
                 Text(track.trackName)
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
@@ -173,28 +140,72 @@ struct SongSearchView: View {
 
             Spacer()
 
+            // Preview button (separate, big, tappable)
+            if track.previewUrl != nil {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        music.togglePreview(for: track)
+                    }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(isPlaying ? Theme.accent : Theme.cardBgElevated)
+                            .frame(width: 38, height: 38)
+
+                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(isPlaying ? .white : Theme.textPrimary)
+                            .offset(x: isPlaying ? 0 : 1)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
             // Add button
             Button {
-                music.stopPreview()
-                onSelect(track)
+                selectAndDismiss(track)
             } label: {
                 Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 28))
+                    .font(.system(size: 30))
                     .foregroundStyle(Theme.accent)
             }
+            .buttonStyle(.plain)
         }
         .padding(.vertical, 10)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 12)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isPlaying ? Theme.accentSoft : .clear)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(isPlaying ? Theme.accentSoft : Theme.cardBg.opacity(0.5))
         )
+    }
+
+    private func albumArt(_ track: MusicTrack) -> some View {
+        Group {
+            if let url = track.artworkMedium, let imgURL = URL(string: url) {
+                AsyncImage(url: imgURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    case .failure:
+                        artPlaceholder
+                    default:
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Theme.cardBgElevated)
+                            .overlay { ProgressView().tint(Theme.textSecondary).scaleEffect(0.6) }
+                    }
+                }
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            } else {
+                artPlaceholder
+            }
+        }
     }
 
     private var artPlaceholder: some View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
             .fill(Theme.cardBgElevated)
-            .frame(width: 60, height: 60)
+            .frame(width: 56, height: 56)
             .overlay {
                 Image(systemName: "music.note")
                     .font(.system(size: 20, weight: .medium))
@@ -214,7 +225,7 @@ struct SongSearchView: View {
     }
 
     private var emptyPrompt: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             if music.isLoadingTrending {
                 VStack(spacing: 14) {
                     ProgressView().tint(Theme.accent).padding(.top, 40)
@@ -235,6 +246,7 @@ struct SongSearchView: View {
                         .tracking(1.5)
                 }
                 .padding(.top, 8)
+                .padding(.bottom, 4)
 
                 ForEach(Array(music.trendingSongs.enumerated()), id: \.element.id) { i, track in
                     trendingRow(track, rank: i + 1)
@@ -260,61 +272,78 @@ struct SongSearchView: View {
     }
 
     private func trendingRow(_ track: MusicTrack, rank: Int) -> some View {
-        Button {
-            music.stopPreview()
-            onSelect(track)
-        } label: {
-            HStack(spacing: 14) {
+        let isPlaying = music.playingTrackId == track.id
+
+        return HStack(spacing: 14) {
+            // Rank badge
+            ZStack {
+                Circle()
+                    .fill(rank <= 3
+                          ? AnyShapeStyle(LinearGradient(colors: Theme.artGradients[rank % Theme.artGradients.count],
+                                                          startPoint: .topLeading, endPoint: .bottomTrailing))
+                          : AnyShapeStyle(Theme.cardBgElevated))
+                    .frame(width: 30, height: 30)
+
                 Text("\(rank)")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(rank <= 3 ? Theme.accent : Theme.textSecondary)
-                    .frame(width: 24)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(rank <= 3 ? .white : Theme.textSecondary)
+            }
 
-                if let url = track.artworkMedium, let imgURL = URL(string: url) {
-                    AsyncImage(url: imgURL) { phase in
-                        switch phase {
-                        case .success(let img):
-                            img.resizable().aspectRatio(contentMode: .fill)
-                        default:
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Theme.cardBgElevated)
-                        }
+            // Art
+            albumArt(track)
+
+            // Info
+            VStack(alignment: .leading, spacing: 3) {
+                Text(track.trackName)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(isPlaying ? Theme.accent : Theme.textPrimary)
+                    .lineLimit(1)
+
+                Text(track.artistName)
+                    .font(.system(size: 13, weight: .regular, design: .rounded))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            // Preview button
+            if track.previewUrl != nil {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        music.togglePreview(for: track)
                     }
-                    .frame(width: 52, height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                } else {
-                    let colors = Theme.artGradients[rank % Theme.artGradients.count]
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .frame(width: 52, height: 52)
-                        .overlay {
-                            Image(systemName: "music.note")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.9))
-                        }
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(isPlaying ? Theme.accent : Theme.cardBgElevated)
+                            .frame(width: 36, height: 36)
+
+                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(isPlaying ? .white : Theme.textPrimary)
+                            .offset(x: isPlaying ? 0 : 1)
+                    }
                 }
+                .buttonStyle(.plain)
+            }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(track.trackName)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
-
-                    Text(track.artistName)
-                        .font(.system(size: 13, weight: .regular, design: .rounded))
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
+            // Add button
+            Button {
+                selectAndDismiss(track)
+            } label: {
                 Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 24))
+                    .font(.system(size: 26))
                     .foregroundStyle(Theme.accent)
             }
-            .padding(.vertical, 8)
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(isPlaying ? Theme.accentSoft : Theme.cardBg.opacity(0.5))
+        )
     }
 
     private var noResults: some View {
