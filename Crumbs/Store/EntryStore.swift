@@ -6,24 +6,53 @@ class EntryStore {
     var entries: [DailyEntry] = []
 
     private let saveKey = "crumbs_entries"
+    private var cloudObserver: NSObjectProtocol?
 
     init() {
         load()
+        cloudObserver = CloudSync.observeChanges { [weak self] in
+            self?.pullFromCloud()
+        }
+    }
+
+    deinit {
+        if let cloudObserver { NotificationCenter.default.removeObserver(cloudObserver) }
     }
 
     // MARK: - Persistence
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: saveKey),
-              let decoded = try? JSONDecoder().decode([DailyEntry].self, from: data) else {
+        if let data = CloudSync.data(forKey: saveKey),
+           let decoded = try? JSONDecoder().decode([DailyEntry].self, from: data) {
+            entries = decoded
+            // Mirror to local for offline.
+            UserDefaults.standard.set(data, forKey: saveKey)
             return
         }
-        entries = decoded
+        if let data = UserDefaults.standard.data(forKey: saveKey),
+           let decoded = try? JSONDecoder().decode([DailyEntry].self, from: data) {
+            entries = decoded
+        }
     }
 
     private func save() {
-        if let data = try? JSONEncoder().encode(entries) {
-            UserDefaults.standard.set(data, forKey: saveKey)
+        guard let data = try? JSONEncoder().encode(entries) else { return }
+        UserDefaults.standard.set(data, forKey: saveKey)
+        CloudSync.set(data, forKey: saveKey)
+    }
+
+    private func pullFromCloud() {
+        guard let data = CloudSync.data(forKey: saveKey),
+              let decoded = try? JSONDecoder().decode([DailyEntry].self, from: data) else {
+            return
+        }
+        // Merge: keep newest per day key.
+        var byKey: [String: DailyEntry] = [:]
+        for e in entries { byKey[e.dateKey] = e }
+        for e in decoded { byKey[e.dateKey] = e }
+        entries = Array(byKey.values).sorted { $0.date < $1.date }
+        if let merged = try? JSONEncoder().encode(entries) {
+            UserDefaults.standard.set(merged, forKey: saveKey)
         }
     }
 
@@ -31,8 +60,19 @@ class EntryStore {
 
     func addEntry(_ entry: DailyEntry) {
         let key = entry.dateKey
+        // Clean up old photo if this day already had a different one.
+        if let existing = entries.first(where: { $0.dateKey == key }),
+           let oldPhoto = existing.photoFilename, oldPhoto != entry.photoFilename {
+            PhotoStorage.delete(oldPhoto)
+        }
         entries.removeAll { $0.dateKey == key }
         entries.append(entry)
+        save()
+    }
+
+    func deleteEntry(_ entry: DailyEntry) {
+        if let photo = entry.photoFilename { PhotoStorage.delete(photo) }
+        entries.removeAll { $0.id == entry.id }
         save()
     }
 
@@ -106,5 +146,38 @@ class EntryStore {
             let c = calendar.dateComponents([.month, .year], from: $0.date)
             return c.month == month && c.year == year
         }.sorted { $0.date < $1.date }
+    }
+
+    func entries(forYear year: Int) -> [DailyEntry] {
+        let calendar = Calendar.current
+        return entries.filter {
+            calendar.component(.year, from: $0.date) == year
+        }.sorted { $0.date < $1.date }
+    }
+
+    // MARK: - "On this day" memories
+
+    /// Entries from previous years on the same month/day as today.
+    func memories(for date: Date = Date()) -> [DailyEntry] {
+        let calendar = Calendar.current
+        let m = calendar.component(.month, from: date)
+        let d = calendar.component(.day, from: date)
+        let yearNow = calendar.component(.year, from: date)
+        return entries.filter {
+            let c = calendar.dateComponents([.month, .day, .year], from: $0.date)
+            return c.month == m && c.day == d && (c.year ?? yearNow) < yearNow
+        }.sorted { $0.date > $1.date }
+    }
+
+    // MARK: - Search
+
+    func search(_ query: String) -> [DailyEntry] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return [] }
+        return entries.filter {
+            $0.win.lowercased().contains(trimmed) ||
+            $0.songTitle.lowercased().contains(trimmed) ||
+            $0.songArtist.lowercased().contains(trimmed)
+        }.sorted { $0.date > $1.date }
     }
 }

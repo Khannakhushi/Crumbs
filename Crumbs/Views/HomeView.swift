@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct HomeView: View {
     @Environment(EntryStore.self) private var store
@@ -6,6 +7,8 @@ struct HomeView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var winText = ""
     @State private var selectedTrack: MusicTrack?
+    @State private var photo: UIImage?
+    @State private var photoPickerItem: PhotosPickerItem?
     @State private var showSaved = false
     @State private var showSongSearch = false
     @State private var editing = false
@@ -41,6 +44,10 @@ struct HomeView: View {
         !winText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && selectedTrack != nil
     }
 
+    private var memories: [DailyEntry] {
+        store.memories()
+    }
+
     var body: some View {
         ZStack {
             AmbientBackground()
@@ -53,6 +60,9 @@ struct HomeView: View {
                         todayCard(entry)
                     } else {
                         inputCard
+                    }
+                    if !memories.isEmpty {
+                        memoriesCard
                     }
                     Spacer(minLength: 60)
                 }
@@ -71,6 +81,9 @@ struct HomeView: View {
             }
             .presentationDetents([.large])
             .presentationCornerRadius(32)
+        }
+        .onChange(of: photoPickerItem) { _, newValue in
+            Task { await loadPhoto(from: newValue) }
         }
     }
 
@@ -132,8 +145,25 @@ struct HomeView: View {
 
     private func todayCard(_ entry: DailyEntry) -> some View {
         VStack(spacing: 0) {
-            // Album art hero
-            if let artURL = entry.artworkURL, let url = URL(string: artURL) {
+            // Photo hero (if any) layered above album art
+            if let photoFile = entry.photoFilename, let img = PhotoStorage.load(photoFile) {
+                ZStack(alignment: .bottomLeading) {
+                    Image(uiImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 240)
+                        .clipped()
+                        .overlay {
+                            LinearGradient(
+                                colors: [.clear, .clear, .black.opacity(0.75)],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        }
+
+                    songCaption(entry)
+                        .padding(22)
+                }
+            } else if let artURL = entry.artworkURL, let url = URL(string: artURL) {
                 ZStack(alignment: .bottomLeading) {
                     AsyncImage(url: url) { phase in
                         switch phase {
@@ -152,48 +182,17 @@ struct HomeView: View {
                         )
                     }
 
-                    HStack(alignment: .bottom) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(entry.songTitle)
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                            Text(entry.songArtist)
-                                .font(.system(size: 15, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.8))
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "music.note")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.6))
-                            .padding(10)
-                            .background(Circle().fill(.white.opacity(0.15)))
-                    }
-                    .padding(22)
+                    songCaption(entry)
+                        .padding(22)
                 }
             } else {
-                // Fallback gradient header
                 ZStack(alignment: .bottomLeading) {
                     Rectangle()
                         .fill(Theme.warmGradient)
                         .frame(height: 130)
 
-                    HStack(spacing: 12) {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.white)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(entry.songTitle)
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                            Text(entry.songArtist)
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.8))
-                        }
-                    }
-                    .padding(22)
+                    songCaption(entry)
+                        .padding(22)
                 }
             }
 
@@ -213,8 +212,10 @@ struct HomeView: View {
                     Spacer()
 
                     Button {
+                        Haptics.tap()
                         winText = entry.win
                         selectedTrack = nil
+                        photo = entry.photoFilename.flatMap { PhotoStorage.load($0) }
                         editing = true
                     } label: {
                         HStack(spacing: 4) {
@@ -240,6 +241,27 @@ struct HomeView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .crumbsCard()
+    }
+
+    private func songCaption(_ entry: DailyEntry) -> some View {
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(entry.songTitle)
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                Text(entry.songArtist)
+                    .font(.system(size: 15, weight: .medium, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+
+            Spacer()
+
+            Image(systemName: "music.note")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white.opacity(0.7))
+                .padding(10)
+                .background(Circle().fill(.white.opacity(0.2)))
+        }
     }
 
     // MARK: - Input card
@@ -300,6 +322,19 @@ struct HomeView: View {
                 }
             }
 
+            // Photo picker
+            VStack(alignment: .leading, spacing: 10) {
+                Text("add a photo (optional)")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.textPrimary)
+
+                if let photo {
+                    selectedPhotoRow(photo)
+                } else {
+                    photoPickerButton
+                }
+            }
+
             // Save
             Button(action: saveEntry) {
                 HStack(spacing: 8) {
@@ -323,6 +358,7 @@ struct HomeView: View {
 
             if editing {
                 Button {
+                    Haptics.tap()
                     editing = false
                     clearInputs()
                 } label: {
@@ -364,7 +400,10 @@ struct HomeView: View {
 
             Spacer()
 
-            Button { showSongSearch = true } label: {
+            Button {
+                Haptics.tap()
+                showSongSearch = true
+            } label: {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.accent)
@@ -381,7 +420,10 @@ struct HomeView: View {
     }
 
     private var searchButton: some View {
-        Button { showSongSearch = true } label: {
+        Button {
+            Haptics.tap()
+            showSongSearch = true
+        } label: {
             HStack(spacing: 12) {
                 GradientIcon(symbol: "music.note",
                              colors: [Color(hex: "E8735A"), Color(hex: "F5A623")],
@@ -412,6 +454,139 @@ struct HomeView: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - Photo UI
+
+    private var photoPickerButton: some View {
+        PhotosPicker(selection: $photoPickerItem, matching: .images, photoLibrary: .shared()) {
+            HStack(spacing: 12) {
+                GradientIcon(symbol: "photo.fill",
+                             colors: [Color(hex: "4FACFE"), Color(hex: "00F2FE")],
+                             size: 16, bgSize: 44)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("add a photo")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("a moment from today")
+                        .font(.system(size: 13, weight: .regular, design: .rounded))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "plus")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Theme.inputBg)
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.divider, lineWidth: 1))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func selectedPhotoRow(_ image: UIImage) -> some View {
+        HStack(spacing: 14) {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("photo attached")
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.textPrimary)
+                Text("tap × to remove")
+                    .font(.system(size: 13, weight: .regular, design: .rounded))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+
+            Spacer()
+
+            Button {
+                Haptics.tap()
+                photo = nil
+                photoPickerItem = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(10)
+                    .background(Circle().fill(Theme.inputBg))
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Theme.inputBg)
+                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.divider, lineWidth: 1))
+        )
+    }
+
+    // MARK: - Memories
+
+    private var memoriesCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                GradientIcon(symbol: "clock.arrow.circlepath",
+                             colors: [Color(hex: "A18CD1"), Color(hex: "FBC2EB")],
+                             size: 12, bgSize: 32)
+
+                Text("ON THIS DAY")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.accent)
+                    .tracking(1.5)
+            }
+
+            ForEach(memories) { entry in
+                memoryRow(entry)
+                if entry.id != memories.last?.id {
+                    Divider().overlay(Theme.divider).padding(.leading, 60)
+                }
+            }
+        }
+        .padding(18)
+        .crumbsCard()
+    }
+
+    private func memoryRow(_ entry: DailyEntry) -> some View {
+        let years = max(1, Calendar.current.component(.year, from: Date()) - Calendar.current.component(.year, from: entry.date))
+        return HStack(alignment: .top, spacing: 14) {
+            if let art = entry.artworkURL, let url = URL(string: art) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let img): img.resizable().aspectRatio(contentMode: .fill)
+                    default: RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.cardBgElevated)
+                    }
+                }
+                .frame(width: 46, height: 46)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            } else {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Theme.warmGradient)
+                    .frame(width: 46, height: 46)
+                    .overlay(Image(systemName: "music.note").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(years) year\(years == 1 ? "" : "s") ago")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.textSecondary)
+                    .tracking(0.6)
+                Text(entry.win)
+                    .font(.system(size: 14, weight: .regular, design: .rounded))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+        }
+    }
+
     // MARK: - Saved overlay
 
     private var savedOverlay: some View {
@@ -438,9 +613,22 @@ struct HomeView: View {
 
     // MARK: - Actions
 
+    private func loadPhoto(from item: PhotosPickerItem?) async {
+        guard let item else { return }
+        if let data = try? await item.loadTransferable(type: Data.self),
+           let img = UIImage(data: data) {
+            await MainActor.run {
+                photo = img
+                Haptics.soft()
+            }
+        }
+    }
+
     private func saveEntry() {
         guard let track = selectedTrack else { return }
-        let entry = DailyEntry(
+        let entryId = store.todayEntry?.id ?? UUID()
+        var entry = DailyEntry(
+            id: entryId,
             date: Date(),
             win: winText.trimmingCharacters(in: .whitespacesAndNewlines),
             songTitle: track.trackName,
@@ -448,7 +636,13 @@ struct HomeView: View {
             artworkURL: track.artworkLarge,
             albumName: track.collectionName
         )
+
+        if let photo {
+            entry.photoFilename = PhotoStorage.save(photo, for: entryId)
+        }
+
         store.addEntry(entry)
+        Haptics.success()
         clearInputs()
         editing = false
         withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) { showSaved = true }
@@ -457,5 +651,10 @@ struct HomeView: View {
         }
     }
 
-    private func clearInputs() { winText = ""; selectedTrack = nil }
+    private func clearInputs() {
+        winText = ""
+        selectedTrack = nil
+        photo = nil
+        photoPickerItem = nil
+    }
 }

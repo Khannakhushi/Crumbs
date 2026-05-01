@@ -6,6 +6,8 @@ struct CalendarView: View {
     @State private var selectedMonth = Calendar.current.component(.month, from: Date())
     @State private var selectedYear = Calendar.current.component(.year, from: Date())
     @State private var selectedEntry: DailyEntry?
+    @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
 
     private let cal = Calendar.current
     private let dayLabels = ["S", "M", "T", "W", "T", "F", "S"]
@@ -40,6 +42,14 @@ struct CalendarView: View {
         store.entries(forMonth: selectedMonth, year: selectedYear).count
     }
 
+    private var searchResults: [DailyEntry] {
+        store.search(searchText)
+    }
+
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         ZStack {
             AmbientBackground()
@@ -47,9 +57,16 @@ struct CalendarView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 24) {
                     header
-                    statsRow
-                    monthNav
-                    calendarGrid
+                    searchBar
+
+                    if isSearching {
+                        searchResultsList
+                    } else {
+                        statsRow
+                        monthNav
+                        calendarGrid
+                    }
+
                     Spacer(minLength: 60)
                 }
                 .padding(.horizontal, 20)
@@ -57,7 +74,7 @@ struct CalendarView: View {
         }
         .sheet(item: $selectedEntry) { entry in
             entrySheet(entry)
-                .presentationDetents([.medium])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(32)
         }
@@ -85,6 +102,126 @@ struct CalendarView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 16)
+    }
+
+    // MARK: - Search
+
+    private var searchBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.textSecondary)
+
+            TextField("search wins, songs, artists...", text: $searchText)
+                .font(.system(size: 15, weight: .regular, design: .rounded))
+                .foregroundStyle(Theme.textPrimary)
+                .focused($searchFocused)
+                .autocorrectionDisabled()
+
+            if !searchText.isEmpty {
+                Button {
+                    Haptics.tap()
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Theme.inputBg)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Theme.divider, lineWidth: 1)
+                )
+        )
+    }
+
+    private var searchResultsList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Text("\(searchResults.count) result\(searchResults.count == 1 ? "" : "s")")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.textSecondary)
+                    .tracking(0.5)
+                Spacer()
+            }
+
+            if searchResults.isEmpty {
+                VStack(spacing: 14) {
+                    GradientIcon(symbol: "questionmark.circle",
+                                 colors: [Color(hex: "FFD700"), Color(hex: "FF6B6B")],
+                                 size: 22, bgSize: 56)
+                        .padding(.top, 30)
+                    Text("no crumbs match")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("try a different word")
+                        .font(.system(size: 14, weight: .regular, design: .rounded))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
+            } else {
+                ForEach(searchResults) { entry in
+                    Button {
+                        Haptics.tap()
+                        selectedEntry = entry
+                    } label: {
+                        searchResultRow(entry)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func searchResultRow(_ entry: DailyEntry) -> some View {
+        let df = DateFormatter()
+        df.dateFormat = "MMM d, yyyy"
+        return HStack(spacing: 14) {
+            if let art = entry.artworkURL, let url = URL(string: art) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let img): img.resizable().aspectRatio(contentMode: .fill)
+                    default: RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.cardBgElevated)
+                    }
+                }
+                .frame(width: 50, height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            } else {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Theme.warmGradient)
+                    .frame(width: 50, height: 50)
+                    .overlay(Image(systemName: "music.note").font(.system(size: 16, weight: .semibold)).foregroundStyle(.white))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(df.string(from: entry.date).lowercased())
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.accent)
+                    .tracking(0.5)
+                Text(entry.win)
+                    .font(.system(size: 14, weight: .regular, design: .rounded))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(2)
+                Text("\(entry.songTitle) · \(entry.songArtist)")
+                    .font(.system(size: 12, weight: .regular, design: .rounded))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Theme.cardBg)
+        )
     }
 
     // MARK: - Stats
@@ -123,7 +260,10 @@ struct CalendarView: View {
 
     private var monthNav: some View {
         HStack {
-            Button { withAnimation(.easeInOut(duration: 0.2)) { prevMonth() } } label: {
+            Button {
+                Haptics.tap()
+                withAnimation(.easeInOut(duration: 0.2)) { prevMonth() }
+            } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Theme.accent)
@@ -135,7 +275,10 @@ struct CalendarView: View {
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundStyle(Theme.textPrimary)
             Spacer()
-            Button { withAnimation(.easeInOut(duration: 0.2)) { nextMonth() } } label: {
+            Button {
+                Haptics.tap()
+                withAnimation(.easeInOut(duration: 0.2)) { nextMonth() }
+            } label: {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(isCurrentMonth ? Theme.heartEmpty : Theme.accent)
@@ -187,7 +330,10 @@ struct CalendarView: View {
         let future = date > Date()
 
         return Button {
-            if let e = store.entry(for: date) { selectedEntry = e }
+            if let e = store.entry(for: date) {
+                Haptics.tap()
+                selectedEntry = e
+            }
         } label: {
             ZStack {
                 if today {
@@ -221,6 +367,15 @@ struct CalendarView: View {
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundStyle(Theme.textPrimary)
                     .padding(.top, 8)
+
+                if let photoFile = entry.photoFilename, let img = PhotoStorage.load(photoFile) {
+                    Image(uiImage: img)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 220)
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
 
                 HStack(spacing: 14) {
                     if let artURL = entry.artworkURL, let url = URL(string: artURL) {

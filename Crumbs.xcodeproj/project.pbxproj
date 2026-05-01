@@ -22,6 +22,15 @@
 		FA0A42A000000000000059 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A000000000000058 /* UserProfile.swift */; };
 		FA0A42A00000000000005B /* ProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A00000000000005A /* ProfileStore.swift */; };
 		FA0A42A00000000000005D /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A00000000000005C /* ProfileView.swift */; };
+		FA0A42A00000000000005F /* CloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A00000000000005E /* CloudSync.swift */; };
+		FA0A42A000000000000061 /* PhotoStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A000000000000060 /* PhotoStorage.swift */; };
+		FA0A42A000000000000063 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A000000000000062 /* NotificationManager.swift */; };
+		FA0A42A000000000000065 /* ExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A000000000000064 /* ExportService.swift */; };
+		FA0A42A000000000000067 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A000000000000066 /* OnboardingView.swift */; };
+		FA0A42A000000000000069 /* YearInReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A000000000000068 /* YearInReviewView.swift */; };
+		FA0A42A00000000000006B /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A00000000000006A /* Haptics.swift */; };
+		FA0A42A00000000000006D /* CrumbsLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A00000000000006C /* CrumbsLogo.swift */; };
+		FA0A42A00000000000006F /* LaunchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0A42A00000000000006E /* LaunchView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,6 +50,15 @@
 		FA0A42A000000000000058 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		FA0A42A00000000000005A /* ProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStore.swift; sourceTree = "<group>"; };
 		FA0A42A00000000000005C /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		FA0A42A00000000000005E /* CloudSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSync.swift; sourceTree = "<group>"; };
+		FA0A42A000000000000060 /* PhotoStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoStorage.swift; sourceTree = "<group>"; };
+		FA0A42A000000000000062 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		FA0A42A000000000000064 /* ExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportService.swift; sourceTree = "<group>"; };
+		FA0A42A000000000000066 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		FA0A42A000000000000068 /* YearInReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YearInReviewView.swift; sourceTree = "<group>"; };
+		FA0A42A00000000000006A /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Haptics.swift; sourceTree = "<group>"; };
+		FA0A42A00000000000006C /* CrumbsLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrumbsLogo.swift; sourceTree = "<group>"; };
+		FA0A42A00000000000006E /* LaunchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -102,6 +120,9 @@
 				FA0A42A00000000000004E /* RecapView.swift */,
 				FA0A42A000000000000056 /* SongSearchView.swift */,
 				FA0A42A00000000000005C /* ProfileView.swift */,
+				FA0A42A000000000000066 /* OnboardingView.swift */,
+				FA0A42A000000000000068 /* YearInReviewView.swift */,
+				FA0A42A00000000000006E /* LaunchView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -112,6 +133,10 @@
 				FA0A42A000000000000048 /* EntryStore.swift */,
 				FA0A42A000000000000054 /* MusicService.swift */,
 				FA0A42A00000000000005A /* ProfileStore.swift */,
+				FA0A42A00000000000005E /* CloudSync.swift */,
+				FA0A42A000000000000060 /* PhotoStorage.swift */,
+				FA0A42A000000000000062 /* NotificationManager.swift */,
+				FA0A42A000000000000064 /* ExportService.swift */,
 			);
 			path = Store;
 			sourceTree = "<group>";
@@ -120,6 +145,8 @@
 			isa = PBXGroup;
 			children = (
 				FA0A42A000000000000044 /* Theme.swift */,
+				FA0A42A00000000000006A /* Haptics.swift */,
+				FA0A42A00000000000006C /* CrumbsLogo.swift */,
 			);
 			path = Theme;
 			sourceTree = "<group>";
@@ -215,6 +242,15 @@
 				FA0A42A000000000000059 /* UserProfile.swift in Sources */,
 				FA0A42A00000000000005B /* ProfileStore.swift in Sources */,
 				FA0A42A00000000000005D /* ProfileView.swift in Sources */,
+				FA0A42A00000000000005F /* CloudSync.swift in Sources */,
+				FA0A42A000000000000061 /* PhotoStorage.swift in Sources */,
+				FA0A42A000000000000063 /* NotificationManager.swift in Sources */,
+				FA0A42A000000000000065 /* ExportService.swift in Sources */,
+				FA0A42A000000000000067 /* OnboardingView.swift in Sources */,
+				FA0A42A000000000000069 /* YearInReviewView.swift in Sources */,
+				FA0A42A00000000000006B /* Haptics.swift in Sources */,
+				FA0A42A00000000000006D /* CrumbsLogo.swift in Sources */,
+				FA0A42A00000000000006F /* LaunchView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

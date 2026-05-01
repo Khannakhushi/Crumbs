@@ -139,31 +139,126 @@ struct GradientIcon: View {
 
 struct AmbientBackground: View {
     @Environment(\.colorScheme) var scheme
+    @State private var drift = false
 
     var body: some View {
         ZStack {
             Theme.bg.ignoresSafeArea()
 
             GeometryReader { geo in
+                // Warm primary glow
                 Circle()
-                    .fill(Theme.accent.opacity(scheme == .dark ? 0.05 : 0.07))
-                    .frame(width: geo.size.width * 0.9)
-                    .blur(radius: 130)
-                    .offset(x: -geo.size.width * 0.3, y: -geo.size.height * 0.12)
+                    .fill(Theme.accent.opacity(scheme == .dark ? 0.10 : 0.10))
+                    .frame(width: geo.size.width * 0.95)
+                    .blur(radius: 140)
+                    .offset(
+                        x: -geo.size.width * (drift ? 0.32 : 0.28),
+                        y: -geo.size.height * (drift ? 0.10 : 0.14)
+                    )
 
+                // Amber secondary
                 Circle()
-                    .fill(Theme.gold.opacity(scheme == .dark ? 0.04 : 0.05))
-                    .frame(width: geo.size.width * 0.7)
-                    .blur(radius: 110)
-                    .offset(x: geo.size.width * 0.35, y: geo.size.height * 0.35)
+                    .fill(Theme.gold.opacity(scheme == .dark ? 0.07 : 0.07))
+                    .frame(width: geo.size.width * 0.75)
+                    .blur(radius: 120)
+                    .offset(
+                        x: geo.size.width * (drift ? 0.4 : 0.32),
+                        y: geo.size.height * (drift ? 0.32 : 0.38)
+                    )
 
+                // Deep ember accent for depth
                 Circle()
-                    .fill(Color(hex: "A18CD1").opacity(scheme == .dark ? 0.03 : 0.04))
-                    .frame(width: geo.size.width * 0.5)
-                    .blur(radius: 90)
-                    .offset(x: geo.size.width * 0.1, y: geo.size.height * 0.7)
+                    .fill(Color(hex: "C94B8C").opacity(scheme == .dark ? 0.05 : 0.04))
+                    .frame(width: geo.size.width * 0.55)
+                    .blur(radius: 100)
+                    .offset(
+                        x: geo.size.width * (drift ? 0.05 : 0.12),
+                        y: geo.size.height * (drift ? 0.72 : 0.68)
+                    )
             }
             .ignoresSafeArea()
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 14).repeatForever(autoreverses: true)) {
+                drift = true
+            }
+        }
+    }
+}
+
+// MARK: - Glass card modifier
+
+struct GlassCard: ViewModifier {
+    @Environment(\.colorScheme) var scheme
+    var cornerRadius: CGFloat = 22
+    var glowColor: Color? = nil
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        .white.opacity(scheme == .dark ? 0.25 : 0.7),
+                                        .white.opacity(scheme == .dark ? 0.04 : 0.15)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+                    .shadow(color: (glowColor ?? .black).opacity(scheme == .dark ? 0.35 : 0.08),
+                            radius: glowColor == nil ? 18 : 28, y: 8)
+            )
+    }
+}
+
+extension View {
+    func glassCard(cornerRadius: CGFloat = 22, glowColor: Color? = nil) -> some View {
+        modifier(GlassCard(cornerRadius: cornerRadius, glowColor: glowColor))
+    }
+}
+
+// MARK: - Glowing thin icon
+
+/// Thin SF Symbol with a soft colored glow underneath. Replaces the chunky
+/// pastel-circle icon style for a more grown-up look.
+struct GlowIcon: View {
+    let symbol: String
+    let tint: Color
+    var size: CGFloat = 22
+
+    @Environment(\.colorScheme) private var scheme
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(tint.opacity(scheme == .dark ? 0.35 : 0.28))
+                .frame(width: size * 2.6, height: size * 2.6)
+                .blur(radius: size * 0.9)
+                .scaleEffect(pulse ? 1.08 : 0.92)
+
+            Image(systemName: symbol)
+                .font(.system(size: size, weight: .medium))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [tint, tint.opacity(0.7)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+                .shadow(color: tint.opacity(0.6), radius: 8)
+        }
+        .frame(width: size * 2.2, height: size * 2.2)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
         }
     }
 }

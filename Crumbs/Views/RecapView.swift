@@ -5,6 +5,7 @@ struct RecapView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var selectedMonth = Calendar.current.component(.month, from: Date())
     @State private var selectedYear = Calendar.current.component(.year, from: Date())
+    @State private var showingYearInReview = false
 
     private let cal = Calendar.current
 
@@ -42,6 +43,7 @@ struct RecapView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 24) {
                     header
+                    yearInReviewCTA
                     monthPicker
 
                     if monthEntries.isEmpty {
@@ -58,6 +60,49 @@ struct RecapView: View {
                 .padding(.horizontal, 20)
             }
         }
+        .fullScreenCover(isPresented: $showingYearInReview) {
+            YearInReviewView(year: selectedYear)
+        }
+    }
+
+    // MARK: - Year in Review CTA
+
+    private var yearInReviewCTA: some View {
+        Button {
+            Haptics.tap()
+            showingYearInReview = true
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            colors: [Color(hex: "C94B8C"), Color(hex: "F5A623")],
+                            startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("your \(String(selectedYear)) in crumbs")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("the wrapped-up version")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .padding(16)
+            .crumbsCard(cornerRadius: 20)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Header

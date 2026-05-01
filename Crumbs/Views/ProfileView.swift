@@ -5,6 +5,8 @@ struct ProfileView: View {
     @Environment(EntryStore.self) private var entryStore
     @Environment(\.colorScheme) private var scheme
     @State private var showAvatarPicker = false
+    @State private var showResetConfirm = false
+    @State private var exportURL: URL?
 
     var body: some View {
         @Bindable var store = profileStore
@@ -14,17 +16,18 @@ struct ProfileView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 28) {
-                    // Avatar + name header
                     avatarHeader
-
-                    // Profile fields
                     fieldsCard
-
-                    // Appearance
+                    remindersCard
                     appearanceCard
-
-                    // Stats
                     statsCard
+                    actionsCard
+
+                    Text("crumbs · v1.0")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Theme.textSecondary.opacity(0.6))
+                        .tracking(1)
+                        .padding(.top, 4)
 
                     Spacer(minLength: 60)
                 }
@@ -37,13 +40,35 @@ struct ProfileView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(32)
         }
+        .sheet(item: $exportURL) { url in
+            ShareLink(item: url) {
+                Label("share crumbs export", systemImage: "square.and.arrow.up")
+            }
+            .padding()
+        }
+        .confirmationDialog(
+            "start onboarding over?",
+            isPresented: $showResetConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("yes, restart onboarding", role: .destructive) {
+                profileStore.profile.hasCompletedOnboarding = false
+                profileStore.save()
+            }
+            Button("cancel", role: .cancel) { }
+        } message: {
+            Text("your crumbs and settings stay. you'll just see the welcome flow again.")
+        }
     }
 
     // MARK: - Avatar header
 
     private var avatarHeader: some View {
         VStack(spacing: 16) {
-            Button { showAvatarPicker = true } label: {
+            Button {
+                Haptics.tap()
+                showAvatarPicker = true
+            } label: {
                 ZStack {
                     let av = profileStore.avatar
                     Circle()
@@ -142,6 +167,70 @@ struct ProfileView: View {
         .padding(.vertical, 14)
     }
 
+    // MARK: - Reminders
+
+    private var remindersCard: some View {
+        @Bindable var store = profileStore
+
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 10) {
+                GradientIcon(symbol: "bell.fill",
+                             colors: [Color(hex: "FA709A"), Color(hex: "FEE140")],
+                             size: 14, bgSize: 34)
+
+                Text("DAILY REMINDER")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.textSecondary)
+                    .tracking(1.5)
+            }
+
+            Toggle(isOn: Binding(
+                get: { store.profile.reminderEnabled },
+                set: { newVal in
+                    Haptics.selection()
+                    if newVal {
+                        Task {
+                            let granted = await NotificationManager.requestAuthorization()
+                            await MainActor.run {
+                                store.profile.reminderEnabled = granted
+                                store.saveAndReschedule()
+                            }
+                        }
+                    } else {
+                        store.profile.reminderEnabled = false
+                        store.saveAndReschedule()
+                    }
+                }
+            )) {
+                Text(store.profile.reminderEnabled ? "we'll nudge you daily" : "no reminders")
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.textPrimary)
+            }
+            .tint(Theme.accent)
+
+            if store.profile.reminderEnabled {
+                let binding = Binding<Date>(
+                    get: { profileStore.reminderDate },
+                    set: { newDate in
+                        profileStore.reminderDate = newDate
+                        profileStore.saveAndReschedule()
+                    }
+                )
+                HStack {
+                    Text("time")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(Theme.textSecondary)
+                    Spacer()
+                    DatePicker("", selection: binding, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .tint(Theme.accent)
+                }
+            }
+        }
+        .padding(18)
+        .crumbsCard()
+    }
+
     // MARK: - Appearance
 
     private var appearanceCard: some View {
@@ -163,6 +252,7 @@ struct ProfileView: View {
                 ForEach(["system", "light", "dark"], id: \.self) { mode in
                     let isSelected = store.profile.appearance == mode
                     Button {
+                        Haptics.selection()
                         withAnimation(.easeInOut(duration: 0.2)) {
                             store.profile.appearance = mode
                             store.save()
@@ -259,6 +349,71 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity)
     }
 
+    // MARK: - Actions (export, reset onboarding)
+
+    private var actionsCard: some View {
+        VStack(spacing: 0) {
+            Button {
+                Haptics.tap()
+                let md = ExportService.markdown(
+                    for: entryStore.entries,
+                    displayName: profileStore.displayName
+                )
+                exportURL = ExportService.writeMarkdownFile(md)
+            } label: {
+                actionRow(
+                    icon: "square.and.arrow.up.fill",
+                    colors: [Color(hex: "43E97B"), Color(hex: "38F9D7")],
+                    title: "export crumbs",
+                    subtitle: "markdown file of every win"
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(entryStore.entries.isEmpty)
+            .opacity(entryStore.entries.isEmpty ? 0.4 : 1)
+
+            Divider().overlay(Theme.divider).padding(.leading, 60)
+
+            Button {
+                Haptics.tap()
+                showResetConfirm = true
+            } label: {
+                actionRow(
+                    icon: "arrow.counterclockwise",
+                    colors: [Color(hex: "A18CD1"), Color(hex: "FBC2EB")],
+                    title: "restart onboarding",
+                    subtitle: "see the welcome again"
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.vertical, 6)
+        .crumbsCard()
+    }
+
+    private func actionRow(icon: String, colors: [Color], title: String, subtitle: String) -> some View {
+        HStack(spacing: 14) {
+            GradientIcon(symbol: icon, colors: colors, size: 14, bgSize: 34)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Theme.textPrimary)
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Theme.textSecondary)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+    }
+
     // MARK: - Avatar picker sheet
 
     private var avatarPickerSheet: some View {
@@ -272,6 +427,7 @@ struct ProfileView: View {
                 ForEach(Theme.avatars) { av in
                     let isSelected = profileStore.profile.avatarIndex == av.id
                     Button {
+                        Haptics.selection()
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                             profileStore.profile.avatarIndex = av.id
                             profileStore.save()
@@ -312,4 +468,9 @@ struct ProfileView: View {
         .padding(.top, 16)
         .background(Theme.bg)
     }
+}
+
+// Make URL Identifiable for the export sheet
+extension URL: @retroactive Identifiable {
+    public var id: String { absoluteString }
 }

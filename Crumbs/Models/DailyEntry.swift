@@ -9,6 +9,12 @@ struct DailyEntry: Codable, Identifiable {
     var artworkURL: String?
     var albumName: String?
 
+    // Optional photo stored on disk; this is just the file name (e.g. "<id>.jpg")
+    var photoFilename: String?
+
+    // Optional mood tag (e.g. "calm", "hyped", "soft")
+    var mood: String?
+
     var dateKey: String {
         Self.keyFormatter.string(from: date)
     }
